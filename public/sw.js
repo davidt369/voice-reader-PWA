@@ -1,4 +1,4 @@
-const CACHE_NAME = "screen-reader-pwa-v10";
+const CACHE_NAME = "screen-reader-pwa-v11";
 const PDFJS_VERSION = "3.11.174";
 
 // URLs esenciales para funcionalidad offline
@@ -7,6 +7,9 @@ const urlsToCache = [
   "/reader",
   "/manifest.json",
   "/placeholder-logo.png",
+  "/_next/static/css/app/layout.css", // CSS crítico
+  "/_next/static/chunks/webpack.js",
+  "/_next/static/chunks/main.js",
 ];
 
 // Recursos opcionales que se cachean si están disponibles
@@ -45,12 +48,11 @@ self.addEventListener("install", (event) => {
         return Promise.resolve();
       } catch (error) {
         console.error("Service Worker: Error durante instalación:", error);
-        return Promise.resolve(); // No fallar completamente
+        return Promise.resolve();
       }
     }),
   );
 
-  // Activar inmediatamente el nuevo Service Worker
   self.skipWaiting();
 });
 
@@ -73,101 +75,155 @@ self.addEventListener("activate", (event) => {
       })
       .then(() => {
         console.log("Service Worker: Activado y tomando control");
-        // Tomar control de todas las pestañas inmediatamente
         return self.clients.claim();
       }),
   );
 });
 
-// Fetch event - Estrategia de caché
+// Fetch event - Estrategia de caché mejorada
 self.addEventListener("fetch", (event) => {
   // Solo interceptar requests HTTP/HTTPS
   if (!event.request.url.startsWith("http")) {
     return;
   }
 
-  // Ignorar requests del Service Worker mismo
-  if (event.request.url.includes("blob:")) {
+  // Ignorar requests problemáticos
+  if (event.request.url.includes("blob:") || 
+      event.request.url.includes("chrome-extension") ||
+      event.request.method !== "GET") {
     return;
   }
 
+  // Para recursos estáticos de Next.js, usar cache-first
+  if (event.request.url.includes("/_next/static/")) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        
+        return fetch(event.request).then((response) => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // Para páginas HTML, usar network-first con fallback
+  if (event.request.mode === "navigate" || 
+      event.request.headers.get("accept")?.includes("text/html")) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseToCache);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request).then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            
+            // Fallback offline page
+            return caches.match("/").then((cachedPage) => {
+              return cachedPage || new Response(
+                `<!DOCTYPE html>
+                <html lang="es">
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <title>Offline - VoiceReader PWA</title>
+                  <style>
+                    body { 
+                      font-family: system-ui, sans-serif; 
+                      padding: 2rem; 
+                      text-align: center; 
+                      background: #f5f5f5;
+                      margin: 0;
+                    }
+                    .offline-message { 
+                      max-width: 500px; 
+                      margin: 2rem auto; 
+                      background: white;
+                      padding: 2rem;
+                      border-radius: 8px;
+                      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }
+                    .icon { font-size: 4rem; margin-bottom: 1rem; }
+                    .retry-btn {
+                      background: #007bff;
+                      color: white;
+                      border: none;
+                      padding: 0.75rem 1.5rem;
+                      border-radius: 4px;
+                      cursor: pointer;
+                      margin-top: 1rem;
+                    }
+                  </style>
+                </head>
+                <body>
+                  <div class="offline-message">
+                    <div class="icon">📱</div>
+                    <h1>Modo Offline</h1>
+                    <p>Esta página no está disponible sin conexión.</p>
+                    <button class="retry-btn" onclick="window.location.reload()">
+                      Reintentar
+                    </button>
+                  </div>
+                </body>
+                </html>`,
+                { 
+                  headers: { 
+                    "Content-Type": "text/html; charset=utf-8" 
+                  } 
+                }
+              );
+            });
+          });
+        })
+    );
+    return;
+  }
+
+  // Para otros recursos, usar cache-first
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
-      // Si está en caché, devolverlo
       if (cachedResponse) {
-        console.log(`Service Worker: Sirviendo desde caché: ${event.request.url}`);
         return cachedResponse;
       }
 
-      // Si no está en caché, intentar fetch
-      return fetch(event.request)
-        .then((response) => {
-          // Solo cachear respuestas exitosas
-          if (!response || response.status !== 200 || response.type !== "basic") {
-            return response;
-          }
-
-          // Clonar la respuesta para poder usarla y cachearla
-          const responseToCache = response.clone();
-
-          caches.open(CACHE_NAME).then((cache) => {
-            // Cachear dinámicamente recursos útiles
-            if (event.request.method === "GET" && !event.request.url.includes("chrome-extension")) {
-              cache.put(event.request, responseToCache).catch((error) => {
-                console.warn("Service Worker: Error al cachear:", error);
-              });
-            }
-          });
-
+      return fetch(event.request).then((response) => {
+        if (!response || response.status !== 200 || response.type !== "basic") {
           return response;
-        })
-        .catch((error) => {
-          console.log(`Service Worker: Fetch falló para ${event.request.url}:`, error);
-          
-          // Si falla el fetch y es una navegación, devolver la página principal
-          if (event.request.mode === "navigate") {
-            return caches.match("/").then((cachedPage) => {
-              return (
-                cachedPage ||
-                new Response(
-                  `<!DOCTYPE html>
-                  <html lang="es">
-                  <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>Offline - VoiceReader PWA</title>
-                    <style>
-                      body { font-family: system-ui, sans-serif; padding: 2rem; text-align: center; }
-                      .offline-message { max-width: 500px; margin: 0 auto; }
-                      .icon { font-size: 4rem; margin-bottom: 1rem; }
-                    </style>
-                  </head>
-                  <body>
-                    <div class="offline-message">
-                      <div class="icon">📱</div>
-                      <h1>Modo Offline</h1>
-                      <p>Esta página no está disponible sin conexión. Por favor, verifica tu conexión a internet e intenta nuevamente.</p>
-                      <p>La funcionalidad básica de lectura de pantalla sigue disponible.</p>
-                    </div>
-                  </body>
-                  </html>`,
-                  { 
-                    headers: { 
-                      "Content-Type": "text/html; charset=utf-8" 
-                    } 
-                  },
-                )
-              );
-            });
-          }
+        }
 
-          // Para otros recursos, devolver error
-          return new Response("Recurso no disponible offline", {
-            status: 503,
-            statusText: "Service Unavailable",
+        const responseToCache = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseToCache).catch((error) => {
+            console.warn("Service Worker: Error al cachear:", error);
           });
         });
-    }),
+
+        return response;
+      }).catch(() => {
+        return new Response("Recurso no disponible offline", {
+          status: 503,
+          statusText: "Service Unavailable",
+        });
+      });
+    })
   );
 });
 

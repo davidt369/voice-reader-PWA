@@ -22,7 +22,6 @@ import {
   Shield,
   Smartphone,
   Globe,
-  Download,
   Play,
   Settings,
   CheckCircle,
@@ -31,13 +30,16 @@ import {
   Clock,
   Target,
   Lightbulb,
+  Download,
 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button-aria"
 import { Menu, MenuItem, MenuTrigger } from "@/components/ui/menu-aria"
 import { useState } from "react"
+import { usePWAInstall } from "@/hooks/use-pwa-install"
 
 export default function LandingPage() {
+  const { isInstallable, installPWA } = usePWAInstall()
   const [formStatus, setFormStatus] = useState<"idle" | "success" | "error">("idle")
   const [errorMessage, setErrorMessage] = useState<string>("")
 
@@ -137,9 +139,9 @@ export default function LandingPage() {
                     variant="ghost" 
                     size="icon" 
                     aria-label="Abrir menú de navegación"
-                    className="h-10 w-10 relative z-50"
+                    className="h-12 w-12 relative z-50"
                   >
-                    <MenuIcon className="h-5 w-5" />
+                    <MenuIcon className="h-6 w-6" />
                   </Button>
                   <Menu className="w-56 min-w-[200px] bg-background border shadow-lg">
                     <MenuItem href="#features" className="px-4 py-3 hover:bg-accent">
@@ -159,6 +161,19 @@ export default function LandingPage() {
               </div>
 
               <ThemeToggle />
+              
+              {/* Botón de instalación PWA */}
+              {isInstallable && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={installPWA}
+                  className="hidden sm:flex items-center gap-2 text-xs"
+                >
+                  <Download className="h-4 w-4" />
+                  Instalar App
+                </Button>
+              )}
             </nav>
           </div>
         </div>
@@ -182,15 +197,15 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-md mx-auto">
-            <Button variant="default" size="lg" asChild className="flex-1">
-              <Link href="/reader" className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-md mx-auto w-full px-4">
+            <Button variant="default" size="lg" asChild className="w-full sm:flex-1 h-12">
+              <Link href="/reader" className="flex items-center gap-2 justify-center">
                 <Play className="h-5 w-5" />
                 Comenzar Gratis
               </Link>
             </Button>
-            <Button variant="outline" size="lg" asChild className="flex-1 bg-transparent">
-              <Link href="#features" className="flex items-center gap-2">
+            <Button variant="outline" size="lg" asChild className="w-full sm:flex-1 h-12 bg-transparent">
+              <Link href="#features" className="flex items-center gap-2 justify-center">
                 <BookOpen className="h-5 w-5" />
                 Explorar Funciones
               </Link>
@@ -958,19 +973,24 @@ export default function LandingPage() {
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Únete a miles de usuarios que ya disfrutan de una forma más inteligente y accesible de consumir contenido.
           </p>
-          <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-md mx-auto">
-            <Button variant="default" size="lg" asChild className="flex-1">
-              <Link href="/reader" className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row justify-center gap-4 max-w-md mx-auto w-full px-4">
+            <Button variant="default" size="lg" asChild className="w-full sm:flex-1 h-12">
+              <Link href="/reader" className="flex items-center gap-2 justify-center">
                 <Play className="h-5 w-5" />
                 Comenzar Ahora
               </Link>
             </Button>
-            <Button variant="outline" size="lg" asChild className="flex-1 bg-transparent">
-              <Link href="#features" className="flex items-center gap-2">
+            {isInstallable && (
+              <Button 
+                variant="outline" 
+                size="lg" 
+                onClick={installPWA}
+                className="w-full sm:flex-1 h-12 bg-transparent flex items-center gap-2 justify-center"
+              >
                 <Download className="h-5 w-5" />
-                Instalar PWA
-              </Link>
-            </Button>
+                Instalar App
+              </Button>
+            )}
           </div>
           <p className="text-sm text-muted-foreground">
             100% gratuito • Sin registro • Funciona offline • Privacidad garantizada

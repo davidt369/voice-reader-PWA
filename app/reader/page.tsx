@@ -42,6 +42,7 @@ import { DocumentGallery } from "@/components/document-gallery"
 import { useDocumentReader } from "@/hooks/use-document-reader"
 import { useScreenReaderAnnouncements } from "@/hooks/use-screen-reader-announcements"
 import { ThemeToggle } from "@/components/theme-toggle"
+import Link from "next/link"
 
 export default function ScreenReaderPWA() {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -253,13 +254,13 @@ export default function ScreenReaderPWA() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-primary rounded-lg" aria-hidden="true">
+              <Link className="p-2 bg-primary rounded-lg" aria-hidden="true" href="/">
                 <img 
                   src="/placeholder-logo.png" 
                   alt="VoiceReader PWA Logo" 
                   className="h-6 w-6" 
                 />
-              </div>
+              </Link>
               <div>
                 <h1 className="text-xl font-bold">VoiceReader PWA</h1>
                 <p className="text-sm text-muted-foreground">Accesibilidad avanzada</p>
