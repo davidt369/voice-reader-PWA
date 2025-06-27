@@ -274,7 +274,11 @@ export default function ScreenReaderPWA() {
                 role="status"
                 aria-label={`Estado de conexión: ${isOnline ? "En línea" : "Sin conexión"}`}
               >
-                {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                {isOnline ? (
+                  <Wifi className="h-3 w-3 text-green-500" />
+                ) : (
+                  <WifiOff className="h-3 w-3 text-red-500" />
+                )}
                 {isOnline ? "Online" : "Offline"}
               </Badge>
               <ThemeToggle />
